@@ -2,7 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import { loginUser, registerUser } from "@/lib/api";
+import { loginUser, loginWithGoogle as authenticateWithGoogle, registerUser } from "@/lib/api";
 import {
   decodeToken,
   setToken,
@@ -15,6 +15,7 @@ interface AuthValue {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -33,6 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async register(name, email, password) {
       const session = await registerUser(name, email, password);
+      setToken(session.token);
+    },
+    async loginWithGoogle(credential) {
+      const session = await authenticateWithGoogle(credential);
       setToken(session.token);
     },
     logout() {

@@ -77,6 +77,14 @@ export function registerUser(name: string, email: string, password: string) {
   });
 }
 
+/** Verifies the Google ID token server-side; works for sign-up and sign-in. */
+export function loginWithGoogle(credential: string) {
+  return request<AuthSession>("/api/auth/google", {
+    method: "POST",
+    body: { credential },
+  });
+}
+
 export interface NewStudioInput {
   name: string;
   category: string;
