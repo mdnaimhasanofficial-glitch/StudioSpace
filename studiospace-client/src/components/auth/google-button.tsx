@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-context";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api";
 
 const GSI_SRC = "https://accounts.google.com/gsi/client";
@@ -53,32 +52,36 @@ export function GoogleAuthButton() {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const renderedRef = useRef(false);
-  const [pending, setPending] = useState(false);
+  // A ref, not state: GIS registers `callback` once, so state captured in the
+  // closure would go stale and the in-flight guard would stop deduplicating.
+  const inFlightRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleCredential(response: GoogleCredentialResponse) {
+  function handleCredential(response: GoogleCredentialResponse) {
     const credential = response?.credential;
-    if (!credential || pending) return;
+    if (!credential || inFlightRef.current) return;
 
+    inFlightRef.current = true;
     setError(null);
-    setPending(true);
 
-    try {
-      await loginWithGoogle(credential);
-
-      // Same `next` handling as the email form in auth-form.tsx.
-      const next = new URLSearchParams(window.location.search).get("next");
-      const target =
-        next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
-      router.push(target);
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Google sign-in failed. Please try again.",
-      );
-      setPending(false);
-    }
+    loginWithGoogle(credential)
+      .then(() => {
+        // Same `next` handling as the email form in auth-form.tsx.
+        const next = new URLSearchParams(window.location.search).get("next");
+        const target =
+          next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+        router.push(target);
+      })
+      .catch((err) => {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Google sign-in failed. Please try again.",
+        );
+      })
+      .finally(() => {
+        inFlightRef.current = false;
+      });
   }
 
   function renderGoogleButton() {
@@ -108,9 +111,7 @@ export function GoogleAuthButton() {
     <div>
       <Script src={GSI_SRC} onReady={renderGoogleButton} />
 
-      <div ref={containerRef} className="flex justify-center">
-        {pending && <Spinner aria-hidden />}
-      </div>
+      <div ref={containerRef} className="flex justify-center" />
 
       {error && (
         <Alert variant="destructive" className="mt-3">
